@@ -1,4 +1,53 @@
 
+
+<?php
+require_once __DIR__ . '/db.php';
+
+// Nhận điều kiện tìm kiếm
+$typeId = $_GET['type_id'] ?? '';
+$maxPrice = $_GET['max_price'] ?? '';
+$capacity = $_GET['capacity'] ?? '';
+
+// Lấy danh sách phòng
+$sql = "
+    SELECT
+        room.room_no,
+        room.room_name,
+        room.main_image,
+        room.dayfee,
+        room.capacity,
+        room.type_id,
+        room_type.type_name
+    FROM room
+    INNER JOIN room_type
+        ON room.type_id = room_type.type_id
+    WHERE 1 = 1
+";
+
+$params = [];
+
+if ($typeId !== '' && in_array($typeId, ['1', '2', '3'], true)) {
+    $sql .= " AND room.type_id = :type_id";
+    $params['type_id'] = (int)$typeId;
+}
+
+if ($maxPrice !== '' && in_array($maxPrice, ['8000', '9000', '10000'], true)) {
+    $sql .= " AND room.dayfee <= :max_price";
+    $params['max_price'] = (int)$maxPrice;
+}
+
+if ($capacity !== '' && in_array($capacity, ['1', '2', '3', '4', '5', '6'], true)) {
+    $sql .= " AND room.capacity >= :capacity";
+    $params['capacity'] = (int)$capacity;
+}
+
+$sql .= " ORDER BY room.room_no ASC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$rooms = $stmt->fetchAll();
+?>
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -593,6 +642,80 @@
                 和室・洋室・和洋室と、ご希望に沿った形でお部屋をお選び頂きます。
             </p>
 
+            <!-- Tìm kiếm phòng -->
+            <form method="GET" action="heyaRoomlist.php"
+                class="room-search mb-4 p-3 border rounded">
+
+                <h4 class="mb-3">お部屋を検索</h4>
+
+                <div class="row g-3">
+
+                    <div class="col-md-4">
+                        <label for="type_id" class="form-label">
+                            お部屋タイプ
+                        </label>
+
+                        <select name="type_id" id="type_id"
+                                class="form-select">
+                                <option value="" <?= $typeId === '' ? 'selected' : '' ?>>すべて</option>
+                                <option value="1" <?= $typeId === '1' ? 'selected' : '' ?>>和室</option>
+                                <option value="2" <?= $typeId === '2' ? 'selected' : '' ?>>洋室</option>
+                                <option value="3" <?= $typeId === '3' ? 'selected' : '' ?>>和洋室</option>
+
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="max_price" class="form-label">
+                            一泊料金の上限
+                        </label>
+
+                        <select name="max_price" id="max_price"
+                                class="form-select">
+                            <option value="" <?= $maxPrice === '' ? 'selected' : '' ?>>指定なし</option>
+                            <option value="8000" <?= $maxPrice === '8000' ? 'selected' : '' ?>>￥8,000まで</option>
+                            <option value="9000" <?= $maxPrice === '9000' ? 'selected' : '' ?>>￥9,000まで</option>
+                            <option value="10000" <?= $maxPrice === '10000' ? 'selected' : '' ?>>￥10,000まで</option>
+
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="capacity" class="form-label">
+                            利用人数
+                        </label>
+
+                          <select name="capacity" id="capacity"
+                                class="form-select">
+                            <option value="">指定なし</option>
+                            <?php for ($i = 1; $i <= 6; $i++): ?>
+                                <option
+                                    value="<?= $i ?>"
+                                    <?= $capacity === (string)$i ? 'selected' : '' ?>
+                                >
+                                    <?= $i ?>名以上
+                                </option>
+                            <?php endfor; ?>
+
+                          </select>
+                    </div>
+
+                </div>
+
+                <div class="mt-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        検索
+                    </button>
+
+                    <a href="heyaRoomlist.php"
+                    class="btn btn-outline-secondary">
+                        リセット
+                    </a>
+                </div>
+
+            </form>
+
+
             <div class="table-responsive">
                 <table class="table table-bordered room-table">
                     <thead>
@@ -604,50 +727,50 @@
                             <th>詳細</th>
                         </tr>
                     </thead>
+                 
+                <!-- thêm data -->
+                  <tbody>
+                    <?php if (count($rooms) > 0): ?>
+                        <?php foreach ($rooms as $room): ?>
+                            <tr>
+                                <td>
+                                    <?= htmlspecialchars($room['room_name']) ?>
+                                </td>
 
-                    <tbody>
+                                <td>
+                                    <?= htmlspecialchars($room['type_name']) ?>
+                                </td>
+
+                                <td>
+                                    ￥<?= number_format($room['dayfee']) ?>
+                                </td>
+
+                                <td>
+                                    <img
+                                        src="./img/images/<?= htmlspecialchars(basename($room['main_image'])) ?>"
+                                        alt="<?= htmlspecialchars($room['room_name']) ?>"
+                                    >
+                                </td>
+
+                                <td>
+                                    <a
+                                        href="./heyaRoomDetail.php?room_no=<?= urlencode($room['room_no']) ?>"
+                                        class="btn btn-danger"
+                                    >
+                                        詳細
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
                         <tr>
-                            <td>ゆとりの和室</td>
-                            <td>和室</td>
-                            <td>￥9000</td>
-                            <td>
-                                <img src="./img/images/room_01_01.jpg"
-                                     alt="和室のイメージ">
-                            </td>
-                            <td>
-                                <a href="./heyaRoomDetail.html"
-                                   class="btn btn-danger">詳細</a>
+                            <td colspan="5">
+                                該当するお部屋がありません。
                             </td>
                         </tr>
+                    <?php endif; ?>
+                </tbody>
 
-                        <tr>
-                            <td>ゆとりの和室</td>
-                            <td>和室</td>
-                            <td>￥9000</td>
-                            <td>
-                                <img src="./img/images/room_02_01.jpg"
-                                     alt="和室のイメージ">
-                            </td>
-                            <td>
-                                <a href="./heyaRoomDetail.html"
-                                   class="btn btn-danger">詳細</a>
-                            </td>
-                        </tr>
-
-                        <tr>
-                            <td>ゆとりの和室</td>
-                            <td>和室</td>
-                            <td>￥9000</td>
-                            <td>
-                                <img src="./img/images/room_03_01.jpg"
-                                     alt="和室のイメージ">
-                            </td>
-                            <td>
-                                <a href="./heyaRoomDetail.html"
-                                   class="btn btn-danger">詳細</a>
-                            </td>
-                        </tr>
-                    </tbody>
                 </table>
             </div>
         </main>
@@ -666,9 +789,9 @@
             <section class="side-section">
                 <h3 class="side-title">お部屋ご紹介</h3>
                 <ul class="side-list">
-                    <li><a href="#">和室</a></li>
-                    <li><a href="#">洋室</a></li>
-                    <li><a href="#">和洋室</a></li>
+                    <li><a href="heyaRoomlist.php?type_id=1">和室</a></li>
+                    <li><a href="heyaRoomlist.php?type_id=2">洋室</a></li>
+                    <li><a href="heyaRoomlist.php?type_id=3">和洋室</a></li>
                 </ul>
             </section>
         </aside>

@@ -1,4 +1,45 @@
+<?php
+require_once __DIR__ . '/db.php';
 
+// Nhận mã phòng từ URL
+$roomNo = filter_input(INPUT_GET, 'room_no', FILTER_VALIDATE_INT);
+
+if (!$roomNo) {
+    http_response_code(400);
+    exit('部屋番号が指定されていません。');
+}
+
+// Lấy thông tin phòng từ database
+$sql = "
+    SELECT
+        room.room_no,
+        room.room_name,
+        room.information,
+        room.main_image,
+        room.image1,
+        room.image2,
+        room.image3,
+        room.amenity,
+        room.dayfee,
+        room.capacity,
+        room_type.type_name
+    FROM room
+    INNER JOIN room_type
+        ON room.type_id = room_type.type_id
+    WHERE room.room_no = :room_no
+";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute(['room_no' => $roomNo]);
+
+$room = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Nếu không tìm thấy phòng
+if (!$room) {
+    http_response_code(404);
+    exit('指定されたお部屋が見つかりません。');
+}
+?>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -407,8 +448,9 @@
         /* Ảnh phòng */
         .room-table td img {
             display: block;
-            width: 60x;
-            height: auto;
+            width: 100%;
+            max-width: 350px;
+            height: 220px;
             object-fit: cover;
             margin: 0 auto;
         }
@@ -538,6 +580,19 @@
         body.fade-out {
             opacity: 0;
         }
+    
+        .back .btn {
+            color: #5a83a2;
+            border: 1px solid #5a83a2;
+            background-color: white;
+            transition: all 0.3s ease;
+        }
+
+        .back .btn:hover {
+            color: white;
+            background-color: #5a83a2;
+            border-color: #5a83a2;
+        }
     </style>
 </head>
 
@@ -590,7 +645,7 @@
 
                 <li class="nav-item">
                     <button class="btn btn-outline-primary">
-                        <a href="./heyaRoomlist.html">お部屋紹介</a>
+                        <a href="./heyaRoomlist.php">お部屋紹介</a>
                     </button>
                 </li>
 
@@ -609,38 +664,102 @@
     ========================= -->
     <div class="container">
 
-        <!-- Nội dung chính -->
-        <main id="main">
-            <h2 class="border border-dark rounded">お部屋詳細</h2>
-            <h3>ゆとりの和室</h3>
-            <hr>
-            <p>
-                お風呂・トイレも部屋内にある、広めの和室です。
-            </p>
-        <!-- bảng -->
-         <div class="table-responsive">
-         <table class= "table table-bordered room-table " >
-           <tr>
-             <td><img src="./img/images/room_01_01.jpg">
-             <td><img src="./img/images/room_01_02.jpg">
-           </tr>
-             <td><img src="./img/images/room_01_03.jpg">
-             <td><img src="./img/images/room_01_04.jpg">
-           <tr>
-           </tr>
-         </table>
-         <br>
-         <table class="table">
-            <th>お部屋タイプ</th>
-            <th>一泊料金</th>
-            <th>アメニティ</th>
-            <tr>
-                <td>和室</td>
-                <td class="number">10,000円</td>
-                <td>テレビ、冷蔵庫、Wi-Fi</td>
-            </tr>
-         </table>
-         </div>
+       <main id="main">
+
+                <h2 class="border border-dark rounded">
+                    お部屋詳細
+                </h2>
+
+                <!-- Tên phòng -->
+                <h3>
+                    <?= htmlspecialchars($room['room_name']) ?>
+                </h3>
+
+                <hr>
+
+                <!-- Mô tả phòng -->
+                <p>
+                    <?= nl2br(htmlspecialchars($room['information'] ?? '')) ?>
+                </p>
+
+                <!-- Bảng hình ảnh -->
+                <div class="table-responsive">
+
+                    <?php
+                    $images = [
+                        $room['main_image'],
+                        $room['image1'],
+                        $room['image2'],
+                        $room['image3']
+                    ];
+
+                    $images = array_filter($images);
+                    ?>
+
+                    <table class="table table-bordered room-table">
+                        <tbody>
+                            <?php foreach (array_chunk($images, 2) as $imageRow): ?>
+                                <tr>
+                                    <?php foreach ($imageRow as $image): ?>
+                                        <td>
+                                            <img
+                                                src="./img/images/<?= htmlspecialchars(basename($image)) ?>"
+                                                alt="<?= htmlspecialchars($room['room_name']) ?>"
+                                            >
+                                        </td>
+                                    <?php endforeach; ?>
+
+                                    <?php if (count($imageRow) === 1): ?>
+                                        <td></td>
+                                    <?php endif; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+
+       <br>
+    
+                    <!-- Bảng thông tin phòng -->
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>お部屋タイプ</th>
+                                <th>一泊料金</th>
+                                <th>アメニティ</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <?= htmlspecialchars($room['type_name']) ?>
+                                </td>
+
+                                <td class="number">
+                                    <?= number_format($room['dayfee']) ?>円
+                                </td>
+
+                                <td>
+                                    <?= htmlspecialchars($room['amenity'] ?? '') ?>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                <!-- Sức chứa -->
+                <p>
+                    <strong>定員：</strong>
+                    <?= (int)$room['capacity'] ?>名
+                </p>
+
+                <!-- Quay lại danh sách -->
+                <a href="./heyaRoomlist.php"
+                class="btn btn-outline-primary mt-3">
+                    お部屋一覧に戻る
+                </a>
+
+            </div>
+
         </main>
 
         <!-- Sidebar -->
